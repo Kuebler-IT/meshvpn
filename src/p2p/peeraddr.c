@@ -27,6 +27,7 @@
 #include "string.h"
 #include <arpa/inet.h>
 #include "p2p.h"
+#include "io.h"
 
 
 // Returns true if PeerAddr is internal.
@@ -89,7 +90,11 @@ void peeraddrSetIndirect(struct s_peeraddr *peeraddr, const int relayid, const i
  */
 void peeraddrToHuman(char * buffer, const struct s_peeraddr * peeraddr) {
     char res[64];
-    inet_ntop(AF_INET, &peeraddr->addr[4], res, 64);
+    if(memcmp(&peeraddr->addr[0], IO_ADDRTYPE_UDP6, 4) == 0) {
+        inet_ntop(AF_INET6, &peeraddr->addr[4], res, 64);
+    } else {
+        inet_ntop(AF_INET, &peeraddr->addr[4], res, 64);
+    }
 
     if(peeraddrGetInternalType(peeraddr) == peeraddr_INTERNAL_INDIRECT) {
         strcpy(buffer, "INDIRECT");
