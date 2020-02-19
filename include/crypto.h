@@ -47,9 +47,9 @@
 
 // cipher context storage
 struct s_crypto {
-        EVP_CIPHER_CTX enc_ctx;
-        EVP_CIPHER_CTX dec_ctx;
-        HMAC_CTX hmac_ctx;
+        EVP_CIPHER_CTX *enc_ctx;
+        EVP_CIPHER_CTX *dec_ctx;
+        HMAC_CTX *hmac_ctx;
 };
 
 
@@ -118,5 +118,13 @@ int cryptoCalculateSHA512(unsigned char *hash_buf, const int hash_len, const uns
 
 // generate session keys from password
 int cryptoSetSessionKeysFromPassword(struct s_crypto *session_ctx, const unsigned char *password, const int password_len, const int cipher_algorithm, const int hmac_algorithm);
+
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+void DH_get0_key(const DH *dh, const BIGNUM **pub_key, const BIGNUM **priv_key);
+HMAC_CTX *HMAC_CTX_new(void);
+void HMAC_CTX_free(HMAC_CTX *ctx);
+EVP_CIPHER_CTX *EVP_CIPHER_CTX_new(void);
+void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *ctx);
+#endif
 
 #endif

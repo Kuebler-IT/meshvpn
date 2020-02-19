@@ -137,44 +137,44 @@ int cryptoSetKeys(struct s_crypto *ctxs, const int count, const unsigned char *s
 	const EVP_MD *out_md = EVP_sha256();
 	const EVP_CIPHER *out_cipher = EVP_aes_256_cbc();
 	const int key_size = EVP_CIPHER_key_length(out_cipher);
-	HMAC_CTX hmac_ctx;
+	HMAC_CTX *hmac_ctx;
 	int16_t i;
 	unsigned char in[2];
 	int j,k;
 
 	// setup hmac as the pseudorandom function
-	HMAC_CTX_init(&hmac_ctx);
+	hmac_ctx = HMAC_CTX_new();
 
 	// calculate seed key
-	HMAC_Init_ex(&hmac_ctx, nonce_buf, nonce_len, keygen_md, NULL);
-	HMAC_Update(&hmac_ctx, secret_buf, secret_len);
-	HMAC_Final(&hmac_ctx, seed_key, (unsigned int *)&seed_key_len);
+	HMAC_Init_ex(hmac_ctx, nonce_buf, nonce_len, keygen_md, NULL);
+	HMAC_Update(hmac_ctx, secret_buf, secret_len);
+	HMAC_Final(hmac_ctx, seed_key, (unsigned int *)&seed_key_len);
 
 	// calculate derived keys
-	HMAC_Init_ex(&hmac_ctx, seed_key, seed_key_len, keygen_md, NULL);
-	HMAC_Update(&hmac_ctx, nonce_buf, nonce_len);
-	HMAC_Final(&hmac_ctx, cur_key, (unsigned int *)&cur_key_len);
+	HMAC_Init_ex(hmac_ctx, seed_key, seed_key_len, keygen_md, NULL);
+	HMAC_Update(hmac_ctx, nonce_buf, nonce_len);
+	HMAC_Final(hmac_ctx, cur_key, (unsigned int *)&cur_key_len);
 	i = 0;
 	j = 0;
 	k = 0;
 	while(k < count) {
 		// calculate next key
 		utilWriteInt16(in, i);
-		HMAC_Init_ex(&hmac_ctx, NULL, -1, NULL, NULL);
-		HMAC_Update(&hmac_ctx, cur_key, cur_key_len);
-		HMAC_Update(&hmac_ctx, nonce_buf, nonce_len);
-		HMAC_Update(&hmac_ctx, in, 2);
-		HMAC_Final(&hmac_ctx, cur_key, (unsigned int *)&cur_key_len);
+		HMAC_Init_ex(hmac_ctx, NULL, -1, NULL, NULL);
+		HMAC_Update(hmac_ctx, cur_key, cur_key_len);
+		HMAC_Update(hmac_ctx, nonce_buf, nonce_len);
+		HMAC_Update(hmac_ctx, in, 2);
+		HMAC_Final(hmac_ctx, cur_key, (unsigned int *)&cur_key_len);
 		if(cur_key_len < key_size) return 0; // check if key is long enough
 		switch(j) {
 			case 1:
 				// save this key as the decryption and encryption key
-				if(!EVP_EncryptInit_ex(&ctxs[k].enc_ctx, out_cipher, NULL, cur_key, NULL)) return 0;
-				if(!EVP_DecryptInit_ex(&ctxs[k].dec_ctx, out_cipher, NULL, cur_key, NULL)) return 0;
+				if(!EVP_EncryptInit_ex(ctxs[k].enc_ctx, out_cipher, NULL, cur_key, NULL)) return 0;
+				if(!EVP_DecryptInit_ex(ctxs[k].dec_ctx, out_cipher, NULL, cur_key, NULL)) return 0;
 				break;
 			case 2:
 				// save this key as the hmac key
-				HMAC_Init_ex(&ctxs[k].hmac_ctx, cur_key, cur_key_len, out_md, NULL);
+				HMAC_Init_ex(ctxs[k].hmac_ctx, cur_key, cur_key_len, out_md, NULL);
 				break;
 			default:
 				// throw this key away
@@ -189,7 +189,7 @@ int cryptoSetKeys(struct s_crypto *ctxs, const int count, const unsigned char *s
 	}
 
 	// clean up
-	HMAC_CTX_cleanup(&hmac_ctx);
+	HMAC_CTX_free(hmac_ctx);
 	return 1;
 }
 
@@ -209,9 +209,9 @@ void cryptoDestroy(struct s_crypto *ctxs, const int count) {
 	int i;
 	cryptoSetKeysRandom(ctxs, count);
 	for(i=0; i<count; i++) {
-		HMAC_CTX_cleanup(&ctxs[i].hmac_ctx);
-		EVP_CIPHER_CTX_cleanup(&ctxs[i].dec_ctx);
-		EVP_CIPHER_CTX_cleanup(&ctxs[i].enc_ctx);
+		HMAC_CTX_free(ctxs[i].hmac_ctx);
+		EVP_CIPHER_CTX_free(ctxs[i].dec_ctx);
+		EVP_CIPHER_CTX_free(ctxs[i].enc_ctx);
 	}
 }
 
@@ -220,9 +220,9 @@ void cryptoDestroy(struct s_crypto *ctxs, const int count) {
 int cryptoCreate(struct s_crypto *ctxs, const int count) {
 	int i;
 	for(i=0; i<count; i++) {
-		EVP_CIPHER_CTX_init(&ctxs[i].enc_ctx);
-		EVP_CIPHER_CTX_init(&ctxs[i].dec_ctx);
-		HMAC_CTX_init(&ctxs[i].hmac_ctx);
+		ctxs[i].enc_ctx = EVP_CIPHER_CTX_new();
+		ctxs[i].dec_ctx = EVP_CIPHER_CTX_new();
+		ctxs[i].hmac_ctx = HMAC_CTX_new();
 	}
 	if(cryptoSetKeysRandom(ctxs, count)) {
 		return 1;
@@ -238,9 +238,9 @@ int cryptoCreate(struct s_crypto *ctxs, const int count) {
 int cryptoHMAC(struct s_crypto *ctx, unsigned char *hmac_buf, const int hmac_len, const unsigned char *in_buf, const int in_len) {
 	unsigned char hmac[EVP_MAX_MD_SIZE];
 	int len;
-	HMAC_Init_ex(&ctx->hmac_ctx, NULL, -1, NULL, NULL);
-	HMAC_Update(&ctx->hmac_ctx, in_buf, in_len);
-	HMAC_Final(&ctx->hmac_ctx, hmac, (unsigned int *)&len);
+	HMAC_Init_ex(ctx->hmac_ctx, NULL, -1, NULL, NULL);
+	HMAC_Update(ctx->hmac_ctx, in_buf, in_len);
+	HMAC_Final(ctx->hmac_ctx, hmac, (unsigned int *)&len);
 	if(len < hmac_len) return 0;
 	memcpy(hmac_buf, hmac, hmac_len);
 	return 1;
@@ -270,9 +270,9 @@ int cryptoSetSessionKeys(struct s_crypto *session_ctx, struct s_crypto *cipher_k
 	if(!cryptoHMAC(md_keygen_ctx, hmac_key, key_size, nonce, nonce_len)) return 0;
 
 	// set the keys
-	if(!EVP_EncryptInit_ex(&session_ctx->enc_ctx, st_cipher.cipher, NULL, cipher_key, NULL)) return 0;
-	if(!EVP_DecryptInit_ex(&session_ctx->dec_ctx, st_cipher.cipher, NULL, cipher_key, NULL)) return 0;
-	HMAC_Init_ex(&session_ctx->hmac_ctx, hmac_key, key_size, st_md.md, NULL);
+	if(!EVP_EncryptInit_ex(session_ctx->enc_ctx, st_cipher.cipher, NULL, cipher_key, NULL)) return 0;
+	if(!EVP_DecryptInit_ex(session_ctx->dec_ctx, st_cipher.cipher, NULL, cipher_key, NULL)) return 0;
+	HMAC_Init_ex(session_ctx->hmac_ctx, hmac_key, key_size, st_md.md, NULL);
 
 	return 1;
 }
@@ -294,10 +294,10 @@ int cryptoEnc(struct s_crypto *ctx, unsigned char *enc_buf, const int enc_len, c
 	cryptoRand(iv, iv_len);
 	memcpy(&enc_buf[hmac_len], iv, iv_len);
 
-	if(!EVP_EncryptInit_ex(&ctx->enc_ctx, NULL, NULL, NULL, iv)) { return 0; }
-	if(!EVP_EncryptUpdate(&ctx->enc_ctx, &enc_buf[(hdr_len)], &len, dec_buf, dec_len)) { return 0; }
+	if(!EVP_EncryptInit_ex(ctx->enc_ctx, NULL, NULL, NULL, iv)) { return 0; }
+	if(!EVP_EncryptUpdate(ctx->enc_ctx, &enc_buf[(hdr_len)], &len, dec_buf, dec_len)) { return 0; }
 	cr_len = len;
-	if(!EVP_EncryptFinal(&ctx->enc_ctx, &enc_buf[(hdr_len + cr_len)], &len)) { return 0; }
+	if(!EVP_EncryptFinal(ctx->enc_ctx, &enc_buf[(hdr_len + cr_len)], &len)) { return 0; }
 	cr_len += len;
 
 	if(!cryptoHMAC(ctx, hmac, hmac_len, &enc_buf[hmac_len], (iv_len + cr_len))) { return 0; }
@@ -325,10 +325,10 @@ int cryptoDec(struct s_crypto *ctx, unsigned char *dec_buf, const int dec_len, c
 	memset(iv, 0, crypto_MAXIVSIZE);
 	memcpy(iv, &enc_buf[hmac_len], iv_len);
 
-	if(!EVP_DecryptInit_ex(&ctx->dec_ctx, NULL, NULL, NULL, iv)) { return 0; }
-	if(!EVP_DecryptUpdate(&ctx->dec_ctx, dec_buf, &len, &enc_buf[hdr_len], (enc_len - hdr_len))) { return 0; }
+	if(!EVP_DecryptInit_ex(ctx->dec_ctx, NULL, NULL, NULL, iv)) { return 0; }
+	if(!EVP_DecryptUpdate(ctx->dec_ctx, dec_buf, &len, &enc_buf[hdr_len], (enc_len - hdr_len))) { return 0; }
 	cr_len = len;
-	if(!EVP_DecryptFinal(&ctx->dec_ctx, &dec_buf[cr_len], &len)) { return 0; }
+	if(!EVP_DecryptFinal(ctx->dec_ctx, &dec_buf[cr_len], &len)) { return 0; }
 	cr_len += len;
 
 	return cr_len;
@@ -389,6 +389,52 @@ int cryptoSetSessionKeysFromPassword(struct s_crypto *session_ctx, const unsigne
 	return ret_b;
 }
 
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
+void DH_get0_key(const DH *dh, const BIGNUM **pub_key, const BIGNUM **priv_key) {
+	if (pub_key != NULL)
+		*pub_key = dh->pub_key;
+	if (priv_key != NULL)
+		*priv_key = dh->priv_key;
+}
 
+HMAC_CTX *HMAC_CTX_new(void) {
+	HMAC_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
+	if (ctx != NULL) {
+		if (!HMAC_CTX_reset(ctx)) {
+			HMAC_CTX_free(ctx);
+			return NULL;
+		}
+	}
+	return ctx;
+}
+
+void HMAC_CTX_free(HMAC_CTX *ctx) {
+	if (ctx != NULL) {
+		hmac_ctx_cleanup(ctx);
+		EVP_MD_CTX_free(ctx->i_ctx);
+		EVP_MD_CTX_free(ctx->o_ctx);
+		EVP_MD_CTX_free(ctx->md_ctx);
+		OPENSSL_free(ctx);
+	}
+}
+
+EVP_CIPHER_CTX *EVP_CIPHER_CTX_new(void) {
+	EVP_CIPHER_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
+	if (ctx != NULL) [
+		if (!EVP_CIPHER_CTX_reset(ctx== {
+			EVP_CIPHER_CTX_free(ctx);
+			return NULL;
+		}
+	}
+	return ctx;
+}
+
+void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *ctx) {
+	if (ctx != NULL) {
+		EVP_CIPHER_CTX_reset(ctx);
+		OPENSSL_free(ctx);
+	}
+}
+#endif
 
 #endif // F_CRYPTO_C
