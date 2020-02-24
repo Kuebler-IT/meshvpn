@@ -98,7 +98,7 @@ int rsaGetFingerprint(unsigned char *buf, const int buf_size, const struct s_rsa
  * keypath should be accessable
  */
 int rsaImportKey(struct s_rsa * rsa, const char *keypath) {
-    OpenSSL_add_all_algorithms();
+    OPENSSL_init_crypto(OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS, NULL);
 
     BIO * in;
     RSA * rsakey;
@@ -328,7 +328,7 @@ int rsaCreate(struct s_rsa *rsa) {
     BN_zero(rsa->bn);
     rsa->key = EVP_PKEY_new();
     if(rsa->key != NULL) {
-        rsa->md = EVP_MD_CTX_create();
+        rsa->md = EVP_MD_CTX_new();
         if(rsa->md != NULL) {
             rsaReset(rsa);
             return 1;
@@ -342,7 +342,7 @@ int rsaCreate(struct s_rsa *rsa) {
 // Destroy a RSA object.
 void rsaDestroy(struct s_rsa *rsa) {
 	rsaReset(rsa);
-	EVP_MD_CTX_destroy(rsa->md);
+	EVP_MD_CTX_free(rsa->md);
 	EVP_PKEY_free(rsa->key);
 	BN_free(rsa->bn);
 }

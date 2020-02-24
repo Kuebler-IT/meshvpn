@@ -340,11 +340,11 @@ int cryptoCalculateHash(unsigned char *hash_buf, const int hash_len, const unsig
 	unsigned char hash[EVP_MAX_MD_SIZE];
 	int len;
 	EVP_MD_CTX *ctx;
-	ctx = EVP_MD_CTX_create();
+	ctx = EVP_MD_CTX_new();
 	EVP_DigestInit_ex(ctx, hash_func, NULL);
 	EVP_DigestUpdate(ctx, in_buf, in_len);
 	EVP_DigestFinal(ctx, hash, (unsigned int *)&len);
-	EVP_MD_CTX_destroy(ctx);
+	EVP_MD_CTX_free(ctx);
 	if(len < hash_len) return 0;
 	memcpy(hash_buf, hash, hash_len);
 	return 1;
@@ -434,6 +434,35 @@ void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *ctx) {
 		EVP_CIPHER_CTX_reset(ctx);
 		OPENSSL_free(ctx);
 	}
+}
+
+EVP_MD_CTX *EVP_MD_CTX_new(void) {
+	return OPENSSL_zalloc(sizeof(EVP_MD_CTX));
+}
+
+void EVP_MD_CTX_free(EVP_MD_CTX *ctx) {
+	EVP_MD_CTX_cleanup(ctx);
+	OPENSSL_free(ctx);
+}
+
+int OPENSSL_init_crypto(uint64_t opts, const OPENSSL_INIT_SETTINGS *settings) {
+	switch (opts) {
+		case OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS | OPENSSL_INIT_LOAD_CONFIG:
+			OPENSSL_add_all_algorithms_conf();
+			break;
+		case OPENSSL_INIT_ADD_ALL_CIPHERS | OPENSSL_INIT_ADD_ALL_DIGESTS:
+			OPENSSL_add_all_algorithms_noconf();
+			break;
+		case OPENSSL_INIT_ADD_ALL_CIPHERS:
+			OpenSSL_add_all_ciphers();
+			break;
+		case OPENSSL_INIT_ADD_ALL_DIGESTS:
+			OpenSSL_add_all_digests();
+			break;
+		default:
+			return 0;
+	}
+	return 1;
 }
 #endif
 

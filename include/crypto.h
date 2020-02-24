@@ -120,11 +120,19 @@ int cryptoCalculateSHA512(unsigned char *hash_buf, const int hash_len, const uns
 int cryptoSetSessionKeysFromPassword(struct s_crypto *session_ctx, const unsigned char *password, const int password_len, const int cipher_algorithm, const int hmac_algorithm);
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
+
+# define OPENSSL_INIT_ADD_ALL_CIPHERS        0x00000004L
+# define OPENSSL_INIT_ADD_ALL_DIGESTS        0x00000008L
+# define OPENSSL_INIT_LOAD_CONFIG            0x00000040L
+
 void DH_get0_key(const DH *dh, const BIGNUM **pub_key, const BIGNUM **priv_key);
 HMAC_CTX *HMAC_CTX_new(void);
 void HMAC_CTX_free(HMAC_CTX *ctx);
 EVP_CIPHER_CTX *EVP_CIPHER_CTX_new(void);
 void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *ctx);
+EVP_MD_CTX *EVP_MD_CTX_new(void);
+void EVP_MD_CTX_free(EVP_MD_CTX *ctx);
+int OPENSSL_init_crypto(uint64_t opts, const OPENSSL_INIT_SETTINGS *settings);
 #endif
 
 #endif
