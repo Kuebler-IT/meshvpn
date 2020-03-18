@@ -120,6 +120,15 @@ int cryptoCalculateSHA512(unsigned char *hash_buf, const int hash_len, const uns
 int cryptoSetSessionKeysFromPassword(struct s_crypto *session_ctx, const unsigned char *password, const int password_len, const int cipher_algorithm, const int hmac_algorithm);
 
 #if OPENSSL_VERSION_NUMBER < 0x10100000L
+#include <openssl/engine.h>
+
+struct ossl_init_settings_st {
+	char *filename;
+	char *appname;
+	unsigned long flags;
+};
+
+typedef struct ossl_init_settings_st OPENSSL_INIT_SETTINGS;
 
 # define OPENSSL_INIT_ADD_ALL_CIPHERS        0x00000004L
 # define OPENSSL_INIT_ADD_ALL_DIGESTS        0x00000008L

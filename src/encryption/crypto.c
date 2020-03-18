@@ -400,49 +400,39 @@ void DH_get0_key(const DH *dh, const BIGNUM **pub_key, const BIGNUM **priv_key) 
 HMAC_CTX *HMAC_CTX_new(void) {
 	HMAC_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
 	if (ctx != NULL) {
-		if (!HMAC_CTX_reset(ctx)) {
-			HMAC_CTX_free(ctx);
-			return NULL;
-		}
+		HMAC_CTX_init(ctx);
 	}
 	return ctx;
 }
 
 void HMAC_CTX_free(HMAC_CTX *ctx) {
 	if (ctx != NULL) {
-		hmac_ctx_cleanup(ctx);
-		EVP_MD_CTX_free(ctx->i_ctx);
-		EVP_MD_CTX_free(ctx->o_ctx);
-		EVP_MD_CTX_free(ctx->md_ctx);
+		HMAC_CTX_cleanup(ctx);
 		OPENSSL_free(ctx);
 	}
 }
 
 EVP_CIPHER_CTX *EVP_CIPHER_CTX_new(void) {
 	EVP_CIPHER_CTX *ctx = OPENSSL_malloc(sizeof(*ctx));
-	if (ctx != NULL) [
-		if (!EVP_CIPHER_CTX_reset(ctx== {
-			EVP_CIPHER_CTX_free(ctx);
-			return NULL;
-		}
+	if (ctx != NULL) {
+		EVP_CIPHER_CTX_init(ctx);
 	}
 	return ctx;
 }
 
 void EVP_CIPHER_CTX_free(EVP_CIPHER_CTX *ctx) {
 	if (ctx != NULL) {
-		EVP_CIPHER_CTX_reset(ctx);
+		EVP_CIPHER_CTX_cleanup(ctx);
 		OPENSSL_free(ctx);
 	}
 }
 
 EVP_MD_CTX *EVP_MD_CTX_new(void) {
-	return OPENSSL_zalloc(sizeof(EVP_MD_CTX));
+	return EVP_MD_CTX_create();
 }
 
 void EVP_MD_CTX_free(EVP_MD_CTX *ctx) {
-	EVP_MD_CTX_cleanup(ctx);
-	OPENSSL_free(ctx);
+	EVP_MD_CTX_destroy(ctx);
 }
 
 int OPENSSL_init_crypto(uint64_t opts, const OPENSSL_INIT_SETTINGS *settings) {
