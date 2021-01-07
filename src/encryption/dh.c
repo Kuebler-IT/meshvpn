@@ -70,10 +70,10 @@ CXzWzPkElg5L22pMUCPfYxo10HKoUHmSYwIBAg==\n\
 
 // Generate a key.
 int dhGenKey(struct s_dh_state *dhstate) {
-	BIGNUM *bn;
+	const BIGNUM *bn;
 	int bn_size;
 	if(DH_generate_key(dhstate->dh)) {
-		bn = dhstate->dh->pub_key;
+		DH_get0_key(dhstate->dh, &bn, NULL);
 		bn_size = BN_num_bytes(bn);
 		if((bn_size > dh_MINSIZE) && (bn_size < dh_MAXSIZE)) {
 			BN_bn2bin(bn, dhstate->pubkey);
@@ -141,13 +141,15 @@ int dhGetPubkey(unsigned char *buf, const int buf_size, const struct s_dh_state 
 // Generate symmetric keys. Returns 1 if succesful.
 int dhGenCryptoKeys(struct s_crypto *ctx, const int ctx_count, const struct s_dh_state *dhstate, const unsigned char *peerkey, const int peerkey_len, const unsigned char *nonce, const int nonce_len) {
 	BIGNUM *bn = dhstate->bn;
+	const BIGNUM *bn2;
 	DH *dh = dhstate->dh;
 	int ret = 0;
 	int maxsize = DH_size(dh);
 	unsigned char secret[maxsize];
 	int size;
 	BN_bin2bn(peerkey, peerkey_len, bn);
-	if(BN_ucmp(bn, dh->pub_key) != 0) {
+	DH_get0_key(dh, &bn2, NULL);
+	if(BN_ucmp(bn, bn2) != 0) {
 		size = DH_compute_key(secret, bn, dh);
 		if(size > 0) {
 			ret = cryptoSetKeys(ctx, ctx_count, secret, size, nonce, nonce_len);

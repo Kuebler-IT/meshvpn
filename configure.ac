@@ -62,7 +62,7 @@ AC_CHECK_LIB([seccomp], [seccomp_init])
 # Checks for header files.
 AC_CHECK_HEADERS([stdlib.h stdio.h unistd.h stdint.h string.h time.h signal.h])
 AC_CHECK_HEADERS([syslog.h fcntl.h seccomp.h netdb.h net/if.h netinet/in.h])
-AC_CHECK_HEADERS([sys/types.h sys/stat.h sys/ioctl.h sys/select.h sys/socket.h])
+AC_CHECK_HEADERS([sys/types.h sys/stat.h sys/ioctl.h sys/epoll.h sys/socket.h])
 AC_CHECK_HEADERS([grp.h pwd.h])
 
 # Checks for typedefs, structures, and compiler characteristics.
@@ -75,7 +75,7 @@ AC_TYPE_UINT64_T
 
 # Checks for library functions.
 AC_FUNC_MALLOC
-AC_CHECK_FUNCS([memset select socket])
+AC_CHECK_FUNCS([memset socket])
 
 # Sanity check for configure
 AC_CONFIG_SRCDIR([src/meshvpn.c])

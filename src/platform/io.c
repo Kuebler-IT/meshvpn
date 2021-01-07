@@ -30,15 +30,15 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include "logging.h"
-
+#include "errno.h"
 
 #if defined(IO_LINUX) || defined(IO_BSD)
 #include <netdb.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
-#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/epoll.h>
 #endif
 
 #if defined(IO_LINUX)
@@ -53,77 +53,55 @@
 
 
 // Returns length of string.
-int ioStrlen(const char *str, const int max_len) {
-	int len;
-	len = 0;
-	if(str != NULL) {
-		while(len < max_len && str[len] != '\0') {
-			len++;
-		}
+size_t ioStrlen(const char *str, const size_t max_len) {
+	if (str == NULL) {
+		return 0;
 	}
-	return len;
+	return strnlen(str, max_len);
 }
 
 
 // Resolve name. Returns number of addresses.
 int ioResolveName(struct s_io_addrinfo *iai, const char *hostname, const char *port) {
-	int ret;
 	struct s_io_addr *iaiaddr;
 	struct sockaddr_in6 *saddr6;
 	struct sockaddr_in *saddr4;
-	struct addrinfo *d;
-	struct addrinfo *di;
+	struct addrinfo *d, *di;
 	struct addrinfo hints;
-
-	ret = 0;
-    debugf("Trying to resolve %s", hostname);
-
+	int ret = 0;
+	debugf("Trying to resolve %s", hostname);
 	if(hostname != NULL && port != NULL) {
 		memset(&hints,0,sizeof(struct addrinfo));
-
-		hints.ai_family = AF_INET6;
+		hints.ai_family = AF_UNSPEC;
 		hints.ai_socktype = SOCK_DGRAM;
 		hints.ai_flags = 0;
 		d = NULL;
 		if(getaddrinfo(hostname, port, &hints, &d) == 0) {
-			di = d;
-			while(di != NULL && ret < 12) {
-				saddr6 = (struct sockaddr_in6 *)di->ai_addr;
+			for (di = d; di != NULL; di = di->ai_next) {
+				if (ret >= 16) {
+					break;
+				}
 				iaiaddr = &iai->item[ret];
-				memcpy(&iaiaddr->addr[0], IO_ADDRTYPE_UDP6, 4); // set address type
-				memcpy(&iaiaddr->addr[4], saddr6->sin6_addr.s6_addr, 16); // copy IPv6 address
-				memcpy(&iaiaddr->addr[20], &saddr6->sin6_port, 2); // copy port
-				memcpy(&iaiaddr->addr[22], "\x00\x00", 2); // empty bytes
-				di = di->ai_next;
+				if (di->ai_family == AF_INET6) {
+					saddr6 = (struct sockaddr_in6 *)di->ai_addr;
+					memcpy(&iaiaddr->addr[0], IO_ADDRTYPE_UDP6, 4); // set address type
+					memcpy(&iaiaddr->addr[4], saddr6->sin6_addr.s6_addr, 16); // copy IPv6 address
+					memcpy(&iaiaddr->addr[20], &saddr6->sin6_port, 2); // copy port
+					memcpy(&iaiaddr->addr[22], "\x00\x00", 2); // empty bytes
+				} else {
+					saddr4 = (struct sockaddr_in *)di->ai_addr;
+					iaiaddr = &iai->item[ret];
+					memcpy(&iaiaddr->addr[0], IO_ADDRTYPE_UDP4, 4); // set address type
+					memcpy(&iaiaddr->addr[4], &saddr4->sin_addr.s_addr, 4); // copy IPv4 address
+					memcpy(&iaiaddr->addr[8], &saddr4->sin_port, 2); // copy port
+					memcpy(&iaiaddr->addr[10], "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 14); // empty bytes
+				}
 				ret++;
 			}
 			freeaddrinfo(d);
 		}
-
-		hints.ai_family = AF_INET;
-		hints.ai_socktype = SOCK_DGRAM;
-		hints.ai_flags = 0;
-		d = NULL;
-		if(getaddrinfo(hostname, port, &hints, &d) == 0) {
-			di = d;
-			while(di != NULL && ret < 16) {
-				saddr4 = (struct sockaddr_in *)di->ai_addr;
-				iaiaddr = &iai->item[ret];
-				memcpy(&iaiaddr->addr[0], IO_ADDRTYPE_UDP4, 4); // set address type
-				memcpy(&iaiaddr->addr[4], &saddr4->sin_addr.s_addr, 4); // copy IPv4 address
-				memcpy(&iaiaddr->addr[8], &saddr4->sin_port, 2); // copy port
-				memcpy(&iaiaddr->addr[10], "\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00", 14); // empty bytes
-				di = di->ai_next;
-				ret++;
-			}
-			freeaddrinfo(d);
-		}
-
 	}
-
-
-
-    debugf("Resolved total %d addresses", ret);
+	debugf("Resolved total %d addresses", ret);
 	iai->count = ret;
 	return ret;
 }
@@ -193,6 +171,9 @@ void ioClose(struct s_io_state *iostate, const int id) {
 	if(id >= 0 && id < iostate->max) {
 		if(iostate->handle[id].enabled) {
 			if(iostate->handle[id].open) {
+#if defined(IO_LINUX) || defined(IO_BSD)
+				epoll_ctl(iostate->epollfd, EPOLL_CTL_DEL, iostate->handle[id].fd, NULL);
+#endif
 				close(iostate->handle[id].fd);
 				iostate->handle[id].open = 0;
 			}
@@ -210,16 +191,12 @@ void ioClose(struct s_io_state *iostate, const int id) {
 
 // Opens a socket. Returns handle ID if successful, or -1 on error.
 int ioOpenSocket(struct s_io_state *iostate, const int iotype, const char *bindaddress, const char *bindport, const int domain, const int type, const int protocol) {
-	int id;
-	int sockfd;
-
-	int so;
-	int fd;
+	int id = -1;
+	int fd, sockfd = -1;
+	int so = 1;
 	const char *zero_c = "0";
-	const char *useport;
-	const char *useaddr;
-	struct addrinfo *d;
-	struct addrinfo *di;
+	const char *useport, *useaddr;
+	struct addrinfo *d, *di = NULL;
 	struct addrinfo hints;
 
 #if defined(IO_LINUX) || defined(IO_BSD)
@@ -233,7 +210,6 @@ int ioOpenSocket(struct s_io_state *iostate, const int iotype, const char *binda
 	}
 
 #if defined(AF_INET6) && defined(IPPROTO_IPV6) && defined(IPV6_V6ONLY)
-	so = 1;
 	if(domain == AF_INET6) {
 		setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, (void *)&so, sizeof(int));
 	}
@@ -274,51 +250,53 @@ int ioOpenSocket(struct s_io_state *iostate, const int iotype, const char *binda
 	hints.ai_socktype = type;
 	hints.ai_protocol = protocol;
 	hints.ai_flags = AI_PASSIVE;
+
 	if(ioStrlen(bindaddress, 255) > 0) {
 		useaddr = bindaddress;
-	}
-	else {
+	} else {
 		useaddr = NULL;
 	}
+
 	if(ioStrlen(bindport, 255) > 0) {
 		useport = bindport;
-	}
-	else {
+	} else {
 		useport = zero_c;
 	}
 
-	d = NULL;
-	di = NULL;
 	if(getaddrinfo(useaddr, useport, &hints, &d) != 0) {
 		close(fd);
 		return -1;
 	}
-
-	di = d;
-	sockfd = -1;
-	while(di != NULL) {
+	for (di = d; di != NULL; di = di->ai_next) {
 		if(bind(fd, di->ai_addr, di->ai_addrlen) == 0) {
 			sockfd = fd;
 			break;
 		}
-		di = di->ai_next;
 	}
 	freeaddrinfo(d);
-
-	if(sockfd < 0) {
+	if (sockfd < 0) {
 		close(fd);
 		return -1;
 	}
 
-	if((id = ioAllocID(iostate)) < 0) {
-		close(fd);
+	id = ioAllocID(iostate);
+	if (id < 0) {
+		debugf("Unable to open a new io socket, id pool exhausted.");
 		return -1;
 	}
 
+#if defined(IO_LINUX) || defined(IO_BSD)
+	struct epoll_event event = {0};
+	event.data.fd = id; //This is not a real fd but our internal id, we use it to allow for fast data lookup after epoll_wait.
+	event.events |= EPOLLIN;
+	if (epoll_ctl(iostate->epollfd, EPOLL_CTL_ADD, fd, &event) < 0) {
+		close(fd);
+		return -1;
+	}
+#endif
 	iostate->handle[id].fd = sockfd;
 	iostate->handle[id].type = iotype;
 	iostate->handle[id].open = 1;
-
 	return id;
 }
 
@@ -522,16 +500,12 @@ HANDLE ioOpenTAPWINHandle(char *tapname, const char *reqname, const int reqname_
 
 // Opens a TAP device. Returns handle ID if succesful, or -1 on error.
 int ioOpenTAP(struct s_io_state *iostate, char *tapname, const char *reqname) {
-	int id;
-	int tapfd;
+	int id = -1;
+	int tapfd = -1;
 	char filename[512];
+	int req_len = ioStrlen(reqname, 255);
 	int name_len;
-	int req_len;
-
-	req_len = ioStrlen(reqname, 255);
 	memset(filename, 0, 512);
-	id = -1;
-	tapfd = -1;
 
 #if defined(IO_LINUX)
 
@@ -665,6 +639,16 @@ int ioOpenTAP(struct s_io_state *iostate, char *tapname, const char *reqname) {
 
 #endif
 
+#if defined(IO_LINUX) || defined(IO_BSD)
+	struct epoll_event event = {0};
+	event.data.fd = id; //This is not a real fd but our internal id, we use it to allow for fast data lookup after epoll_wait.
+	event.events |= EPOLLIN;
+	if (epoll_ctl(iostate->epollfd, EPOLL_CTL_ADD, tapfd, &event) < 0) {
+		close(tapfd);
+		return -1;
+	}
+#endif
+
 	iostate->handle[id].fd = tapfd;
 	iostate->handle[id].type = IO_TYPE_FILE;
 	return id;
@@ -699,6 +683,14 @@ int ioOpenTAP(struct s_io_state *iostate, char *tapname, const char *reqname) {
 
 #endif
 
+#if defined(IO_LINUX) || defined(IO_BSD)
+	struct epoll_event event = {0};
+	event.data.fd = id; //This is not a real fd but our internal id, we use it to allow for fast data lookup after epoll_wait.
+	event.events |= EPOLLIN;
+	if (epoll_ctl(iostate->epollfd, EPOLL_CTL_ADD, STDIN_FILENO, &event) < 0) {
+		return -1;
+	}
+#endif
 	return id;
 }
 
@@ -749,7 +741,7 @@ int ioOpenTAP(struct s_io_state *iostate, char *tapname, const char *reqname) {
 
 #if defined(IO_WINDOWS)
 // Finish receiving an UDP packet. Returns amount of bytes read, or 0 if nothing is read.
- int ioHelperFinishRecvFrom(struct s_io_handle *handle) {
+int ioHelperFinishRecvFrom(struct s_io_handle *handle) {
 	DWORD len;
 	DWORD flags;
 
@@ -782,7 +774,7 @@ int ioOpenTAP(struct s_io_state *iostate, char *tapname, const char *reqname) {
 
 
 // Sends an UDP packet. Returns length of sent message.
- int ioHelperSendTo(struct s_io_handle *handle, const unsigned char *send_buf, const int send_buf_size, const struct sockaddr *destination_sockaddr, const socklen_t destination_sockaddr_len) {
+int ioHelperSendTo(struct s_io_handle *handle, const unsigned char *send_buf, const int send_buf_size, const struct sockaddr *destination_sockaddr, const socklen_t destination_sockaddr_len) {
 	int len;
 
 #if defined(IO_LINUX) || defined(IO_BSD)
@@ -1015,39 +1007,18 @@ int ioReadAll(struct s_io_state *iostate) {
 
 #if defined(IO_LINUX) || defined(IO_BSD)
 
-	fd_set fdset;
-	struct timeval seltimeout;
-	int fd, fdh;
-
-	seltimeout.tv_sec = iostate->timeout;
-	seltimeout.tv_usec = 0;
-
-	fdh = 0;
-	FD_ZERO(&fdset);
-	for(i=0; i<iostate->max; i++) {
-		if(iostate->handle[i].enabled) {
-			fd = iostate->handle[i].fd;
-			FD_SET(fd, &fdset);
-			if(fdh < (fd+1)) {
-				fdh = (fd+1);
-			}
-		}
+	struct epoll_event* events = calloc(64, sizeof(struct epoll_event));
+	if(events == NULL) {
+		return -1;
 	}
-
-	ret = 0;
-	if(!(fdh < 0)) {
-		if(select(fdh, &fdset, NULL, NULL, &seltimeout) > 0) {
-			for(i=0; i<iostate->max; i++) {
-				if(iostate->handle[i].enabled) {
-					if(FD_ISSET(iostate->handle[i].fd, &fdset)) {
-						ioPreRead(iostate, i);
-						if(ioRead(iostate, i) > 0) {
-							ret++;
-						}
-					}
-				}
-			}
-		}
+	ret = epoll_wait(iostate->epollfd, events, 64, iostate->timeout * 1000);
+	if (ret < 0) {
+		debugf("epoll_wait failed, error: '%s' [%d]", strerror(errno), errno);
+		return -1;
+	}
+	for (i = 0; i < ret; ++i) {
+		ioPreRead(iostate, events[i].data.fd);
+		ioRead(iostate, events[i].data.fd);
 	}
 
 #elif defined(IO_WINDOWS)
@@ -1300,9 +1271,16 @@ void ioReset(struct s_io_state *iostate) {
 
 // Create IO state structure. Returns 1 on success.
 int ioCreate(struct s_io_state *iostate, const int io_bufsize, const int io_max) {
-#ifdef IO_WINDOWS
+#if defined(IO_WINDOWS)
 	WSADATA wsadata;
-	if(WSAStartup(MAKEWORD(2,2), &wsadata) != 0) { return 0; }
+	if (WSAStartup(MAKEWORD(2,2), &wsadata) != 0) {
+		 return 0;
+	}
+#elif defined(IO_LINUX) || defined(IO_BSD)
+	iostate->epollfd = epoll_create1(0);
+	if (iostate->epollfd == -1) {
+		debugf("epoll_create1 failed, error: '%s' [%d]", strerror(errno), errno);
+	}
 #endif
 
 	if((io_bufsize > 0) && (io_max > 0)) { // check parameters
@@ -1332,7 +1310,7 @@ void ioDestroy(struct s_io_state *iostate) {
 	iostate->max = 0;
 	iostate->count = 0;
 
-#ifdef IO_WINDOWS
+#if defined(IO_WINDOWS)
 	WSACleanup();
 #endif
 }

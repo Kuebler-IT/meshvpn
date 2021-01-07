@@ -289,7 +289,7 @@ void p2psecDisableRelay(struct s_p2psec *p2psec) {
 int p2psecLoadDefaults(struct s_p2psec *p2psec) {
 	if(!p2psecLoadDH(p2psec)) return 0;
 	p2psecSetFlag(p2psec, (~(0)), 0);
-	p2psecSetMaxConnectedPeers(p2psec, 256);
+	p2psecSetMaxConnectedPeers(p2psec, 65536);
 	p2psecSetAuthSlotCount(p2psec, 32);
 	p2psecDisableLoopback(p2psec);
 	p2psecEnableFastauth(p2psec);
