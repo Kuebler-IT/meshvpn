@@ -61,8 +61,8 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <sys/ioctl.h>
-#include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/epoll.h>
 #endif
 
 #if defined(IO_LINUX)
@@ -89,55 +89,58 @@
 
 // The IO addr structure.
 struct s_io_addr {
-        unsigned char addr[24];
+	unsigned char addr[24];
 };
 
 
 // The IO addrinfo structure.
 struct s_io_addrinfo {
-        struct s_io_addr item[16];
-        int count;
+	struct s_io_addr item[16];
+	int count;
 };
 
 
 // The IO handle structure.
 struct s_io_handle {
-        int enabled;
-        int fd;
-        struct sockaddr_storage source_sockaddr;
-        struct s_io_addr source_addr;
-        int group_id;
-        int content_len;
-        int type;
-        int open;
+	int enabled;
+	int fd;
+	struct sockaddr_storage source_sockaddr;
+	struct s_io_addr source_addr;
+	int group_id;
+	int content_len;
+	int type;
+	int open;
 #if defined(IO_WINDOWS)
-        HANDLE fd_h;
-        int open_h;
-        OVERLAPPED ovlr;
-        int ovlr_used;
-        OVERLAPPED ovlw;
-        int ovlw_used;
+	HANDLE fd_h;
+	int open_h;
+	OVERLAPPED ovlr;
+	int ovlr_used;
+	OVERLAPPED ovlw;
+	int ovlw_used;
 #endif
 };
 
 
 // The IO state structure.
 struct s_io_state {
-        unsigned char *mem;
-        struct s_io_handle *handle;
-        int bufsize;
-        int max;
-        int count;
-        int timeout;
-        int sockmark;
-        int nat64clat;
-        unsigned char nat64_prefix[12];
-        int debug;
+	unsigned char *mem;
+	struct s_io_handle *handle;
+	int bufsize;
+	int max;
+	int count;
+	int timeout;
+	int sockmark;
+	int nat64clat;
+	unsigned char nat64_prefix[12];
+	int debug;
+#if defined(IO_LINUX) || defined(IO_BSD)
+	int epollfd;
+#endif
 };
 
 
 // Returns length of string.
-int ioStrlen(const char *str, const int max_len);
+size_t ioStrlen(const char *str, const size_t max_len);
 
 // Resolve name. Returns number of addresses.
 int ioResolveName(struct s_io_addrinfo *iai, const char *hostname, const char *port);
