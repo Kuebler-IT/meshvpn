@@ -22,7 +22,7 @@ A virtual network built by MeshVPN uses a full mesh topology. All nodes talks
 directly to each other, there is no need for a central server. If one node goes
 down, the rest of the network is unaffected.
 
-Configuring MeerVPN is easy. You just need to configure a network name,
+Configuring MeshVPN is easy. You just need to configure a network name,
 a password and the contact information (IP address and port) of another
 PeerVPN node. Adding a new node to an existing network doesn't require the
 existing nodes to alter their configuration, because its IP address is
