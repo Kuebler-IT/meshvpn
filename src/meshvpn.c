@@ -34,8 +34,6 @@
 #include "app.h"
 #include "logging.h"
 
-struct s_p2psec * g_p2psec = NULL;
-
 int show_usage(void);
 
 // commandline parser

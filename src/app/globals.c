@@ -19,48 +19,25 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef H_GLOBALS
-#define H_GLOBALS
+#ifndef F_GLOBALS_C
+#define F_GLOBALS_C
 
 #include "io.h"
 #include "p2p.h"
 #include "ethernet.h"
 
-// compile time options & timing parameters
-#define INITPEER_STORAGE 1024
+struct s_io_state iostate;
+struct s_p2psec * g_p2psec;
+int g_mainloop;
 
+struct s_switch_state g_switchstate;
+struct s_ndp6_state g_ndpstate;
+struct s_virtserv_state g_virtserv;
 
-// config parser options
-#define CONFPARSER_LINEBUF_SIZE 4096
-#define CONFPARSER_NAMEBUF_SIZE 512
-
-// encryption options
-#define ENCRYPTION_ASYM
-
-// iogrps
-#define IOGRP_DEFAULT 0
-#define IOGRP_SOCKET 1
-#define IOGRP_TAP 2
-#define IOGRP_CONSOLE 3
-
-struct s_initpeers {
-        struct s_io_addr * addresses;
-        int count;
-};
-
-// global variables
-extern struct s_io_state iostate;
-extern struct s_p2psec * g_p2psec;
-extern int g_mainloop;
-
-extern struct s_switch_state g_switchstate;
-extern struct s_ndp6_state g_ndpstate;
-extern struct s_virtserv_state g_virtserv;
-
-extern int g_enableconsole;
-extern int g_enableeth;
-extern int g_enablendpcache;
-extern int g_enablevirtserv;
-extern int g_enableengines;
+int g_enableconsole;
+int g_enableeth;
+int g_enablendpcache;
+int g_enablevirtserv;
+int g_enableengines;
 
 #endif

@@ -41,6 +41,7 @@ meshvpn_SOURCES = \
 	platform/seccomp.c \
 	platform/perms.c \
 	platform/ifconfig.c \
+	app/globals.c \
 	app/init.c \
 	app/loop.c \
 	app/config.c \
