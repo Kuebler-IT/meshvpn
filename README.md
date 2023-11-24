@@ -1,5 +1,7 @@
-[![Build Status](https://travis-ci.org/Kuebler-IT/MeshVPN.svg?branch=master)](https://travis-ci.org/Kuebler-IT/MeshVPN)
-[![BCH compliance](https://bettercodehub.com/edge/badge/Kuebler-IT/MeshVPN?branch=master)](https://bettercodehub.com/)
+# MeshVPN
+
+[![Build Status](https://github.com/github/docs/actions/workflows/main.yml/badge.svg)](https://github.com/Kuebler-IT/MeshVPN/actions)
+[![Codacy Badge](https://app.codacy.com/project/badge/Grade/45808fccdbf14cd9a0b7738e06395750)](https://app.codacy.com/gh/Kuebler-IT/MeshVPN/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade)
 
 MeshVPN is a fork from PeerVPN to fix the not merged issues since a couple
 of years. Some features are planned an will be updated in future.
@@ -44,11 +46,11 @@ in the sample meshvpn.conf that is bundled together with the program.
 
 ## Platforms & Dependencies
 
-MeshVPN is available for Linux and FreeBSD. Additionally, one of the following
+MeshVPN is available for Linux, MacOS and FreeBSD. Additionally, one of the following
 crypto libraries is required:
 
--   [LibreSSL](https://www.libressl.org) (recommended)
--   [OpenSSL](https://www.openssl.org) 1.0.X (note: the 1.1.x has incompatible API changes)
+- [LibreSSL](https://www.libressl.org) (recommended)
+- [OpenSSL](https://www.openssl.org)
 
 ## License
 
