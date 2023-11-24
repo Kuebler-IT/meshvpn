@@ -47,9 +47,15 @@
 
 // cipher context storage
 struct s_crypto {
+#if OPENSSL_VERSION_NUMBER < 0x10100000L
         EVP_CIPHER_CTX enc_ctx;
         EVP_CIPHER_CTX dec_ctx;
         HMAC_CTX hmac_ctx;
+#else
+        EVP_CIPHER_CTX *enc_ctx;
+        EVP_CIPHER_CTX *dec_ctx;
+        HMAC_CTX *hmac_ctx;
+#endif
 };
 
 
