@@ -22,15 +22,15 @@ dnl Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.69])
 
-AC_INIT([MeshVPN], [1.0.0-alpha.1], [b.kuebler@kuebler-it.de])
+AC_INIT([MeshVPN], [1.1.0-alpha.1], [b.kuebler@kuebler-it.de])
 
 # Platform specific settings
 AC_CANONICAL_HOST
 case $host_os in
   darwin* )
         # Do something specific for mac
-        LDFLAGS="-L/usr/local/opt/openssl/lib $LDFLAGS"
-        CPPFLAGS="-I/usr/local/opt/openssl/include $CPPFLAGS"
+        LDFLAGS="-L/usr/local/opt/libressl/lib $LDFLAGS"
+        CPPFLAGS="-I/usr/local/opt/libressl/include $CPPFLAGS"
         ;;
   linux*)
         # Do something specific for linux
@@ -55,7 +55,8 @@ AC_PROG_INSTALL
 
 # Checks for libraries.
 AC_CHECK_LIB([z], [compress])
-AC_CHECK_LIB([ssl], [SSL_library_init])
+AC_CHECK_LIB([ssl], [SSL_library_init]) # old openssl or compatible library like libressl
+AC_CHECK_LIB([ssl], [OPENSSL_init_ssl]) # we have openssl also newer version
 AC_CHECK_LIB([crypto], [ENGINE_init])
 AC_CHECK_LIB([seccomp], [seccomp_init])
 
