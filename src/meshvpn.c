@@ -34,8 +34,6 @@
 #include "app.h"
 #include "logging.h"
 
-struct s_p2psec * g_p2psec = NULL;
-
 int show_usage(void);
 
 // commandline parser
@@ -108,24 +106,31 @@ int main(int argc, char **argv) {
 }
 
 int show_usage(void) {
-        const char title[] =
-                PACKAGE_STRING " " TARGET_ALIAS
+	const char title[] =
+#ifdef PACKAGE_STRING
+	PACKAGE_STRING
+#endif
+	" "
+#ifdef TARGET_ALIAS
+	TARGET_ALIAS
+#endif
 #ifdef HAVE_LIBSECCOMP
-                " [SECCOMP]"
+	" [SECCOMP]"
 #endif
 #ifdef HAVE_LIBCRYPTO
-                " [CRYPTO]"
+	" [CRYPTO]"
 #endif
 #ifdef HAVE_LIBSSL
-                " [SSL]"
+	" [SSL]"
 #endif
 #ifdef HAVE_LIBZ
-                " [ZLIB]"
+	" [ZLIB]"
 #endif
-                " built on " __DATE__
-        ;
+	" built on "
+	__DATE__
+	;
 
-        printf("%s\n\n", title);
+	printf("%s\n\n", title);
 	printf("Usage: meshvpn <configfile>\n");
 	return 2;
 }
